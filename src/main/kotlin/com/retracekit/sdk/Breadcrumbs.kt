@@ -1,11 +1,10 @@
 package com.retracekit.sdk
 
-import java.util.concurrent.CopyOnWriteArrayList
-
 private const val MAX_BREADCRUMBS = 24
 
 internal object Breadcrumbs {
-	private val queue = CopyOnWriteArrayList<Breadcrumb>()
+	private val lock = Any()
+	private val queue = ArrayDeque<Breadcrumb>(MAX_BREADCRUMBS)
 
 	fun add(
 		type: BreadcrumbType,
@@ -24,18 +23,22 @@ internal object Breadcrumbs {
 					status = status,
 					duration = duration,
 				)
-			queue.add(crumb)
-			while (queue.size > MAX_BREADCRUMBS) {
-				queue.removeAt(0)
+			synchronized(lock) {
+				if (queue.size >= MAX_BREADCRUMBS) {
+					queue.removeFirst()
+				}
+				queue.addLast(crumb)
 			}
-		} catch (_: Exception) {
+		} catch (_: Throwable) {
 			// Never throw into host application code.
 		}
 	}
 
-	fun snapshot(): List<Breadcrumb> = queue.toList()
+	fun snapshot(): List<Breadcrumb> = synchronized(lock) { queue.toList() }
 
 	fun resetForTesting() {
-		queue.clear()
+		synchronized(lock) {
+			queue.clear()
+		}
 	}
 }

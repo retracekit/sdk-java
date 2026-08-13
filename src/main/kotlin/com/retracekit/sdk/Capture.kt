@@ -7,7 +7,23 @@ import java.time.format.DateTimeFormatter
 
 internal fun utcNowIso(): String = DateTimeFormatter.ISO_INSTANT.format(Instant.now())
 
-internal fun defaultUserAgent(): String = "Java ${Runtime.version()}"
+/**
+ * Normalized user-agent: `Java {major[.minor[.security]]}` from [Runtime.Version]
+ * (feature / interim / update), without build metadata.
+ */
+internal fun defaultUserAgent(): String {
+	val version = Runtime.version()
+	val feature = version.feature()
+	val interim = version.interim()
+	val update = version.update()
+	val normalized =
+		when {
+			update != 0 -> "$feature.$interim.$update"
+			interim != 0 -> "$feature.$interim"
+			else -> "$feature"
+		}
+	return "Java $normalized"
+}
 
 internal fun throwableStacktrace(error: Throwable): String {
 	val writer = StringWriter()
@@ -20,7 +36,11 @@ internal object Capture {
 
 	private val capturing = ThreadLocal.withInitial { false }
 
-	fun captureException(error: Throwable, contextOverrides: Map<String, Any?>? = null) {
+	fun captureException(
+		error: Throwable,
+		contextOverrides: Map<String, Any?>? = null,
+		flushSync: Boolean = false,
+	) {
 		if (capturing.get() == true) {
 			return
 		}
@@ -39,33 +59,38 @@ internal object Capture {
 			var allowSend = true
 			try {
 				dedupKey = computeDedupKey(name, message, stacktrace)
-				allowSend = dedupCache.shouldSend(dedupKey, System.currentTimeMillis())
-			} catch (_: Exception) {
+				allowSend = dedupCache.tryAcquire(dedupKey, System.currentTimeMillis())
+			} catch (_: Throwable) {
 				// Fail-open when dedup logic throws.
+				dedupKey = null
 			}
 
 			if (!allowSend) {
 				return
 			}
 
-			val payload =
-				buildPayload(
-					config = cfg,
-					name = name,
-					message = message,
-					stacktrace = stacktrace,
-					contextOverrides = contextOverrides,
-				)
-			Transport.sendErrorEvent(payload, cfg.apiKey, cfg.endpoint)
-
-			if (dedupKey != null) {
-				try {
-					dedupCache.recordSend(dedupKey, System.currentTimeMillis())
-				} catch (_: Exception) {
-					// Ignore cache write failures.
+			try {
+				val payload =
+					buildPayload(
+						config = cfg,
+						name = name,
+						message = message,
+						stacktrace = stacktrace,
+						contextOverrides = contextOverrides,
+					)
+				val accepted =
+					if (flushSync) {
+						Transport.sendErrorEventSync(payload, cfg.apiKey, cfg.endpoint)
+					} else {
+						Transport.sendErrorEvent(payload, cfg.apiKey, cfg.endpoint)
+					}
+				if (!accepted) {
+					dedupKey?.let { dedupCache.release(it) }
 				}
+			} catch (_: Throwable) {
+				dedupKey?.let { dedupCache.release(it) }
 			}
-		} catch (_: Exception) {
+		} catch (_: Throwable) {
 			// Never throw into host application code.
 		} finally {
 			capturing.set(false)

@@ -1,6 +1,7 @@
 package com.retracekit.sdk
 
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicReference
 import java.util.logging.Logger
 
 /**
@@ -65,8 +66,7 @@ internal object SdkState {
 	@Volatile
 	private var config: InternalConfig? = null
 
-	@Volatile
-	private var sessionId: String? = null
+	private val sessionId = AtomicReference<String?>(null)
 
 	@Volatile
 	private var warnedAboutMissingApiKey: Boolean = false
@@ -117,7 +117,7 @@ internal object SdkState {
 				Handlers.install()
 				pingSession()
 			}
-		} catch (_: Exception) {
+		} catch (_: Throwable) {
 			// Never throw into host application code.
 		}
 	}
@@ -129,7 +129,7 @@ internal object SdkState {
 		return cfg != null && cfg.enabled && cfg.apiKey.isNotEmpty()
 	}
 
-	fun sessionId(): String? = sessionId
+	fun sessionId(): String? = sessionId.get()
 
 	fun pingSession() {
 		try {
@@ -137,7 +137,7 @@ internal object SdkState {
 				return
 			}
 			val cfg = config ?: return
-			val sid = sessionId ?: return
+			val sid = sessionId.get() ?: return
 			val body =
 				Transport.buildSessionJson(
 					sessionId = sid,
@@ -150,21 +150,21 @@ internal object SdkState {
 				cfg.apiKey,
 				Transport.deriveSessionsEndpoint(cfg.endpoint),
 			)
-		} catch (_: Exception) {
+		} catch (_: Throwable) {
 			// Never throw into host application code.
 		}
 	}
 
 	private fun ensureSessionId() {
-		if (sessionId == null) {
-			sessionId = UUID.randomUUID().toString()
+		if (sessionId.get() == null) {
+			sessionId.compareAndSet(null, UUID.randomUUID().toString())
 		}
 	}
 
 	fun resetForTesting() {
 		Handlers.resetForTesting()
 		config = null
-		sessionId = null
+		sessionId.set(null)
 		warnedAboutMissingApiKey = false
 		Breadcrumbs.resetForTesting()
 		Tags.resetForTesting()

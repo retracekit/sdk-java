@@ -30,6 +30,25 @@ dependencies {
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+val generatedVersionDir = layout.buildDirectory.dir("generated/retrace-kit-version")
+
+tasks.register("writeVersionResource") {
+	val outDir = generatedVersionDir
+	val ver = provider { project.version.toString() }
+	inputs.property("version", ver)
+	outputs.dir(outDir)
+	doLast {
+		val dir = outDir.get().asFile
+		dir.mkdirs()
+		dir.resolve("retrace-kit-version.txt").writeText(ver.get())
+	}
+}
+
+tasks.processResources {
+	dependsOn("writeVersionResource")
+	from(generatedVersionDir)
+}
+
 tasks.test {
 	useJUnitPlatform()
 }
@@ -56,6 +75,20 @@ publishing {
 						name.set("Apache License 2.0")
 						url.set("https://www.apache.org/licenses/LICENSE-2.0")
 					}
+				}
+				developers {
+					developer {
+						name.set("Ildar Timerbaev")
+					}
+				}
+				scm {
+					connection.set("scm:git:git://github.com/RetraceKit/sdk-java.git")
+					developerConnection.set("scm:git:ssh://git@github.com/RetraceKit/sdk-java.git")
+					url.set("https://github.com/RetraceKit/sdk-java")
+				}
+				issueManagement {
+					system.set("GitHub")
+					url.set("https://github.com/RetraceKit/sdk-java/issues")
 				}
 			}
 		}

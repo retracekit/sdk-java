@@ -7,14 +7,21 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.Level
 import java.util.logging.Logger
 
 internal object Transport {
 	private val logger = Logger.getLogger("retrace_kit")
 	private const val SDK_INTERNAL_HEADER = "X-RT-SDK-Internal"
+	private const val UNCAUGHT_REQUEST_TIMEOUT_SECONDS = 2L
+	private const val DEFAULT_REQUEST_TIMEOUT_SECONDS = 10L
+	private val threadCounter = AtomicInteger(0)
 
 	private val httpClient: HttpClient =
 		HttpClient.newBuilder()
@@ -22,11 +29,19 @@ internal object Transport {
 			.build()
 
 	private val executor: ExecutorService =
-		Executors.newCachedThreadPool { runnable ->
-			Thread(runnable, "retrace-kit-transport").apply {
-				isDaemon = true
-			}
-		}
+		ThreadPoolExecutor(
+			2,
+			4,
+			60L,
+			TimeUnit.SECONDS,
+			ArrayBlockingQueue(64),
+			{ runnable ->
+				Thread(runnable, "retrace-kit-transport-${threadCounter.incrementAndGet()}").apply {
+					isDaemon = true
+				}
+			},
+			ThreadPoolExecutor.AbortPolicy(),
+		)
 
 	fun deriveSessionsEndpoint(errorEventsEndpoint: String): String {
 		if (errorEventsEndpoint.contains("/error-events")) {
@@ -41,30 +56,56 @@ internal object Transport {
 		}
 	}
 
-	fun sendErrorEvent(payloadJson: String, apiKey: String, endpoint: String) {
-		sendInBackground(endpoint, apiKey, payloadJson, "error event")
-	}
+	/** @return true if the send was accepted onto the transport queue. */
+	fun sendErrorEvent(payloadJson: String, apiKey: String, endpoint: String): Boolean =
+		sendInBackground(endpoint, apiKey, payloadJson, "error event", DEFAULT_REQUEST_TIMEOUT_SECONDS)
+
+	/**
+	 * Best-effort synchronous send for uncaught-exception flush.
+	 * Uses a short request timeout so the host is not blocked indefinitely.
+	 *
+	 * @return true if the HTTP call completed (any status); false on transport failure.
+	 */
+	fun sendErrorEventSync(payloadJson: String, apiKey: String, endpoint: String): Boolean =
+		postJson(endpoint, apiKey, payloadJson, "error event", UNCAUGHT_REQUEST_TIMEOUT_SECONDS)
 
 	fun sendSessionPing(payloadJson: String, apiKey: String, endpoint: String) {
-		sendInBackground(endpoint, apiKey, payloadJson, "session ping")
+		sendInBackground(endpoint, apiKey, payloadJson, "session ping", DEFAULT_REQUEST_TIMEOUT_SECONDS)
 	}
 
-	private fun sendInBackground(url: String, apiKey: String, body: String, eventLabel: String) {
-		try {
+	private fun sendInBackground(
+		url: String,
+		apiKey: String,
+		body: String,
+		eventLabel: String,
+		timeoutSeconds: Long,
+	): Boolean {
+		return try {
 			executor.execute {
-				postJson(url, apiKey, body, eventLabel)
+				postJson(url, apiKey, body, eventLabel, timeoutSeconds)
 			}
-		} catch (err: Exception) {
+			true
+		} catch (err: RejectedExecutionException) {
+			logger.warning("[retrace-kit sdk] transport queue full; dropping $eventLabel")
+			false
+		} catch (err: Throwable) {
 			logger.log(Level.SEVERE, "[retrace-kit sdk] failed to send $eventLabel: $err")
+			false
 		}
 	}
 
-	private fun postJson(url: String, apiKey: String, body: String, eventLabel: String) {
-		try {
+	private fun postJson(
+		url: String,
+		apiKey: String,
+		body: String,
+		eventLabel: String,
+		timeoutSeconds: Long,
+	): Boolean {
+		return try {
 			val request =
 				HttpRequest.newBuilder()
 					.uri(URI.create(url))
-					.timeout(Duration.ofSeconds(10))
+					.timeout(Duration.ofSeconds(timeoutSeconds))
 					.header("Content-Type", "application/json")
 					.header("Authorization", "Bearer $apiKey")
 					.header("X-RT-SDK-Version", VERSION)
@@ -78,8 +119,10 @@ internal object Transport {
 					"[retrace-kit sdk] failed to send $eventLabel: HTTP ${response.statusCode()}",
 				)
 			}
-		} catch (err: Exception) {
+			true
+		} catch (err: Throwable) {
 			logger.log(Level.SEVERE, "[retrace-kit sdk] failed to send $eventLabel: $err")
+			false
 		}
 	}
 

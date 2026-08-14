@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Optional version override (e.g. 0.1.0). Leave empty to use build.gradle.kts."
+        description: "Optional version override (e.g. 0.1.1). Leave empty to use build.gradle.kts."
         required: false
         type: string
 

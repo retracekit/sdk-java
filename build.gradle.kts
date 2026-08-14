@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "cloud.retracekit"
-version = "0.1.0"
+version = "0.1.1"
 description = "Lightweight JVM error tracking SDK for Retrace Kit"
 
 repositories {

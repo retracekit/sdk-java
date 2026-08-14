@@ -158,7 +158,7 @@ class RetraceKitInitTest {
 		)
 		assertTrue(SdkState.isCaptureEnabled())
 		assertEquals("java", Tags.snapshot()["runtime"])
-		assertEquals("0.1.0", RetraceKit.getVersion())
+		assertEquals("0.1.1", RetraceKit.getVersion())
 	}
 
 	@Test

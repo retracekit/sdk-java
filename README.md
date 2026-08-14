@@ -28,14 +28,14 @@ Catch exceptions, attach context, and send them to [Retrace Kit](https://retrace
 Maven Central publishing is coming soon. Coordinates:
 
 ```text
-cloud.retracekit:sdk:0.1.0
+cloud.retracekit:sdk:0.1.1
 ```
 
 Gradle (Kotlin DSL):
 
 ```kotlin
 dependencies {
-    implementation("cloud.retracekit:sdk:0.1.0")
+    implementation("cloud.retracekit:sdk:0.1.1")
 }
 ```
 
@@ -45,7 +45,7 @@ Maven:
 <dependency>
   <groupId>cloud.retracekit</groupId>
   <artifactId>sdk</artifactId>
-  <version>0.1.0</version>
+  <version>0.1.1</version>
 </dependency>
 ```
 
@@ -148,7 +148,7 @@ Repository: [github.com/RetraceKit/sdk-java](https://github.com/RetraceKit/sdk-j
 
 ## Publishing
 
-Releases go to Maven Central from GitHub Actions on `v*` tags (`v0.1.0` → `0.1.0`).
+Releases go to Maven Central from GitHub Actions on `v*` tags (`v0.1.1` → `0.1.1`).
 
 Set these repository secrets before the first tag:
 
@@ -161,8 +161,8 @@ Set these repository secrets before the first tag:
 | `SIGNING_IN_MEMORY_KEY_PASSWORD` | Key passphrase |
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 ## License

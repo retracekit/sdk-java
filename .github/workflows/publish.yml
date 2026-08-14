@@ -43,11 +43,47 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.version != ''
         run: sed -i 's/^version = .*/version = "${{ inputs.version }}"/' build.gradle.kts
 
+      # Gradle's in-memory signer wants real newlines and an 8-char key id.
+      # GitHub secrets often store the armored key as one line with literal \n,
+      # and SIGNING_IN_MEMORY_KEY_ID may be the 16-char long id.
+      - name: Prepare signing material
+        env:
+          RAW_SIGNING_KEY: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+          RAW_SIGNING_KEY_ID: ${{ secrets.SIGNING_IN_MEMORY_KEY_ID }}
+        run: |
+          python3 <<'PY'
+          import os
+          from pathlib import Path
+
+          key = os.environ.get("RAW_SIGNING_KEY") or ""
+          key = key.replace("\r\n", "\n").replace("\r", "\n").strip()
+          if "-----BEGIN" in key and "\n-----BEGIN" not in key and "\\n" in key:
+              key = key.replace("\\n", "\n")
+          if "-----BEGIN PGP PRIVATE KEY BLOCK-----" not in key:
+              raise SystemExit(
+                  "SIGNING_IN_MEMORY_KEY is missing the PGP header. "
+                  "Paste the full armored private key, including BEGIN/END lines."
+              )
+          Path("signing-key.asc").write_text(key + "\n")
+
+          key_id = (os.environ.get("RAW_SIGNING_KEY_ID") or "").strip().replace(" ", "")
+          if len(key_id) > 8:
+              key_id = key_id[-8:]
+          Path("signing-key-id.txt").write_text(key_id)
+          print(f"Prepared armored key ({len(key)} chars), key id suffix={key_id or '(omitted)'}")
+          PY
+          {
+            echo "ORG_GRADLE_PROJECT_signingInMemoryKey<<EOF"
+            cat signing-key.asc
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+          if [ -s signing-key-id.txt ]; then
+            echo "ORG_GRADLE_PROJECT_signingInMemoryKeyId=$(cat signing-key-id.txt)" >> "$GITHUB_ENV"
+          fi
+
       - name: Publish to Maven Central
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_IN_MEMORY_KEY_ID }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
         run: ./gradlew publishToMavenCentral --no-configuration-cache

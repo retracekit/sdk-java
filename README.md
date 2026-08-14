@@ -156,8 +156,8 @@ Set these repository secrets before the first tag:
 | --- | --- |
 | `MAVEN_CENTRAL_USERNAME` | Central Portal user token username |
 | `MAVEN_CENTRAL_PASSWORD` | Central Portal user token password |
-| `SIGNING_IN_MEMORY_KEY` | ASCII-armored private key (`gpg --export-secret-keys --armor <key id>`) |
-| `SIGNING_IN_MEMORY_KEY_ID` | GPG key id (optional if the armored key is unique) |
+| `SIGNING_IN_MEMORY_KEY` | ASCII-armored private key (`gpg --export-secret-keys --armor <key id>`), including BEGIN/END lines |
+| `SIGNING_IN_MEMORY_KEY_ID` | Last 8 hex chars of the key id (e.g. `7B81DFCC`). Longer ids are trimmed in CI. |
 | `SIGNING_IN_MEMORY_KEY_PASSWORD` | Key passphrase |
 
 ```bash

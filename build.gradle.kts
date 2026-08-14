@@ -1,7 +1,7 @@
 plugins {
-	kotlin("jvm") version "2.0.21"
+	kotlin("jvm") version "2.2.0"
 	`java-library`
-	`maven-publish`
+	id("com.vanniktech.maven.publish") version "0.37.0"
 }
 
 group = "cloud.retracekit"
@@ -13,8 +13,6 @@ repositories {
 }
 
 java {
-	withSourcesJar()
-	withJavadocJar()
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(17)
 	}
@@ -59,38 +57,46 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 	}
 }
 
-publishing {
-	publications {
-		create<MavenPublication>("maven") {
-			from(components["java"])
-			groupId = "cloud.retracekit"
-			artifactId = "sdk"
-			version = project.version.toString()
-			pom {
-				name.set("Retrace Kit SDK")
-				description.set(project.description)
-				url.set("https://retracekit.cloud")
-				licenses {
-					license {
-						name.set("Apache License 2.0")
-						url.set("https://www.apache.org/licenses/LICENSE-2.0")
-					}
-				}
-				developers {
-					developer {
-						name.set("Ildar Timerbaev")
-					}
-				}
-				scm {
-					connection.set("scm:git:git://github.com/RetraceKit/sdk-java.git")
-					developerConnection.set("scm:git:ssh://git@github.com/RetraceKit/sdk-java.git")
-					url.set("https://github.com/RetraceKit/sdk-java")
-				}
-				issueManagement {
-					system.set("GitHub")
-					url.set("https://github.com/RetraceKit/sdk-java/issues")
-				}
+mavenPublishing {
+	coordinates("cloud.retracekit", "sdk", version.toString())
+	publishToMavenCentral(automaticRelease = true)
+	if (hasSigningConfig()) {
+		signAllPublications()
+	}
+
+	pom {
+		name.set("Retrace Kit SDK")
+		description.set(project.description)
+		inceptionYear.set("2026")
+		url.set("https://retracekit.cloud")
+		licenses {
+			license {
+				name.set("The Apache License, Version 2.0")
+				url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+				distribution.set("repo")
 			}
 		}
+		developers {
+			developer {
+				id.set("dkildar")
+				name.set("Ildar Timerbaev")
+				url.set("https://github.com/dkildar")
+			}
+		}
+		scm {
+			url.set("https://github.com/RetraceKit/sdk-java")
+			connection.set("scm:git:git://github.com/RetraceKit/sdk-java.git")
+			developerConnection.set("scm:git:ssh://git@github.com/RetraceKit/sdk-java.git")
+		}
+		issueManagement {
+			system.set("GitHub")
+			url.set("https://github.com/RetraceKit/sdk-java/issues")
+		}
 	}
+}
+
+fun hasSigningConfig(): Boolean {
+	val inMemoryKey = providers.gradleProperty("signingInMemoryKey")
+	val keyId = providers.gradleProperty("signing.keyId")
+	return inMemoryKey.isPresent || keyId.isPresent
 }

@@ -146,6 +146,25 @@ Repository: [github.com/RetraceKit/sdk-java](https://github.com/RetraceKit/sdk-j
 ./gradlew publishToMavenLocal
 ```
 
+## Publishing
+
+Releases go to Maven Central from GitHub Actions on `v*` tags (`v0.1.0` → `0.1.0`).
+
+Set these repository secrets before the first tag:
+
+| Secret | Value |
+| --- | --- |
+| `MAVEN_CENTRAL_USERNAME` | Central Portal user token username |
+| `MAVEN_CENTRAL_PASSWORD` | Central Portal user token password |
+| `SIGNING_IN_MEMORY_KEY` | ASCII-armored private key (`gpg --export-secret-keys --armor <key id>`) |
+| `SIGNING_IN_MEMORY_KEY_ID` | GPG key id (optional if the armored key is unique) |
+| `SIGNING_IN_MEMORY_KEY_PASSWORD` | Key passphrase |
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 ## License
 
 Apache-2.0

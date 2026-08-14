@@ -43,8 +43,11 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.version != ''
         run: sed -i 's/^version = .*/version = "${{ inputs.version }}"/' build.gradle.kts
 
-      - name: Publish (skeleton)
-        run: |
-          echo "Maven Central publishing is not configured yet."
-          echo "Build publication locally with: ./gradlew publishToMavenLocal"
-          ./gradlew publishToMavenLocal
+      - name: Publish to Maven Central
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_IN_MEMORY_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
+        run: ./gradlew publishToMavenCentral --no-configuration-cache

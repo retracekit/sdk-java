@@ -64,18 +64,14 @@ import com.retracekit.sdk.RetraceKit
 RetraceKit.init(
     Config(
         apiKey = System.getenv("RETRACE_KIT_API_KEY")!!,
-        endpoint = System.getenv("RETRACE_KIT_ENDPOINT")
-            ?: "https://api.retracekit.cloud/api/error-events",
-        serverUrl = System.getenv("RETRACE_KIT_SERVER_URL"),
-        environment = System.getenv("RETRACE_KIT_ENVIRONMENT"),
-        release = System.getenv("RETRACE_KIT_RELEASE"),
     ),
 )
 ```
 
-Requires Java 17+.  
+Requires Java 17+. `apiKey` is enough.  
 Uncaught errors are reported automatically after `init`.  
-Events use `userAgent` like `Java 21.0.2` and tag `runtime=java`.
+Events use `userAgent` like `Java 21.0.2` and tag `runtime=java`.  
+Optional `release` should come from the JAR `Implementation-Version` (`App::class.java.getPackage()?.implementationVersion`).
 
 ## Java
 
@@ -86,9 +82,6 @@ import com.retracekit.sdk.RetraceKit;
 RetraceKit.init(
     Config.builder()
         .apiKey(System.getenv("RETRACE_KIT_API_KEY"))
-        .endpoint("https://api.retracekit.cloud/api/error-events")
-        .environment("production")
-        .release("1.0.0")
         .build()
 );
 ```
@@ -108,11 +101,12 @@ import com.retracekit.sdk.BreadcrumbType
 import com.retracekit.sdk.Config
 import com.retracekit.sdk.RetraceKit
 
+val release = App::class.java.getPackage()?.implementationVersion
+
 RetraceKit.init(
     Config(
         apiKey = System.getenv("RETRACE_KIT_API_KEY")!!,
-        environment = "production",
-        release = "1.2.3",
+        release = release,
     ),
 )
 
@@ -127,7 +121,7 @@ RetraceKit.addBreadcrumb(
 try {
     checkout()
 } catch (error: Throwable) {
-    RetraceKit.captureException(error)
+    RetraceKit.captureException(error, mapOf("url" to request.requestURI))
 }
 ```
 
